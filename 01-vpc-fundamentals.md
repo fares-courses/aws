@@ -96,6 +96,51 @@ The cheap insurance is **deliberate CIDR planning from day one**: assign a disti
 
 **Why it's hard to change:** the primary CIDR is set at creation. You can *add* secondary ranges but can't shrink or relocate the primary without recreating the VPC — and everything in it. Measure twice.
 
+### 3.3b How VPC Peering Works (and Why CIDR Matters)
+
+**VPC Peering** is a direct network tunnel between two VPCs that lets them communicate as if on the same network.
+
+**Step-by-step:**
+
+1. **Create peering request** — owner of Prod VPC requests connection to Analytics VPC
+2. **Accept** — Analytics VPC owner accepts
+3. **Add routes** — each VPC's route table learns how to reach the other:
+   - Prod route table: "Traffic to 10.50.x.x → Analytics VPC via peering"
+   - Analytics route table: "Traffic to 10.20.x.x → Prod VPC via peering"
+4. **Allow in security groups** — each VPC permits traffic from the other's CIDR
+5. **Now they communicate** — Analytics EC2 can query Prod RDS directly
+
+**Real scenario: Analytics pulls from Prod**
+
+```
+Analytics EC2 (10.50.1.100) tries to connect to Prod RDS (10.20.2.50)
+
+Step 1: Analytics EC2 sends packet to 10.20.2.50
+Step 2: Route table lookup: "10.20.x.x → use peering"
+Step 3: Packet flows through peering tunnel
+Step 4: Prod VPC receives packet
+Step 5: RDS security group checks: "10.50.0.0/16 allowed?" → Yes ✓
+Step 6: Connection established, query runs ✓
+```
+
+**Why distinct CIDRs are critical:**
+
+With collision (both use 10.0.0.0/16):
+```
+Route table sees packet to 10.0.2.50
+Question: Is this local (Analytics) or peering (Prod)?
+✗ AMBIGUOUS — routing fails
+```
+
+Without collision (Analytics 10.50.0.0/16, Prod 10.20.0.0/16):
+```
+Route table sees packet to 10.20.2.50
+Answer: That's Prod's range → route via peering
+Route table sees packet to 10.50.2.50
+Answer: That's local → stay in Analytics
+✓ Clear and unambiguous
+```
+
 ### 3.4 A VPC spans a region, not an AZ
 
 A VPC lives in one **region** but automatically spans every **AZ** in it. So high availability — surviving a datacenter failure — comes from spreading subnets across AZs *inside the one VPC*, not from multiple VPCs. Lesson 02 uses this directly. For now: **VPC = region-wide; the AZ choice happens at the subnet level.**
