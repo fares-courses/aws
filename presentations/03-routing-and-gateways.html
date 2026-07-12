@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>03 — Routing & Gateways · AWS Field Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#080d16;
+    --bg-2:#0b1120;
+    --panel:rgba(255,255,255,.025);
+    --panel-2:rgba(255,255,255,.05);
+    --line:rgba(100,180,120,.08);
+    --line-strong:rgba(100,180,120,.22);
+    --ink:#e4eef0;
+    --muted:#8aabab;
+    --faint:#50707a;
+    --green:#4ade80;
+    --green-2:#a3f0c4;
+    --amber:#ffb454;
+    --amber-2:#ffd79a;
+    --wire:#5bb0ff;
+    --rose:#fb7185;
+    --teal:#5eead4;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+
+  body{
+    background-color:var(--bg);
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:36px 36px;
+    color:var(--ink);
+    font-family:"Hanken Grotesk",system-ui,sans-serif;
+    font-size:clamp(15px,1.05vw + 9px,19px);
+    line-height:1.6;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(900px 600px at 90% -5%, rgba(74,222,128,.09),transparent 60%),
+      radial-gradient(1000px 700px at 5% 105%, rgba(91,176,255,.09),transparent 60%),
+      radial-gradient(1200px 900px at 50% 50%, transparent, rgba(5,10,18,.7) 100%);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.04;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .deck{position:relative;z-index:1;height:100vh;width:100vw}
+
+  .slide{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:clamp(28px,5vw,90px) clamp(26px,7vw,140px);
+    opacity:0;visibility:hidden;
+    transform:scale(.985);
+    transition:opacity .45s ease,transform .45s ease,visibility .45s;
+    overflow:hidden;
+  }
+  .slide.is-active{opacity:1;visibility:visible;transform:none}
+  .wrap{width:100%;max-width:1160px;margin:0 auto}
+
+  [data-reveal]{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .65s cubic-bezier(.2,.8,.2,1)}
+  .slide.is-active [data-reveal]{opacity:1;transform:none}
+
+  /* typography */
+  .kicker{font-family:"JetBrains Mono",monospace;font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;
+          color:var(--green);font-weight:600;display:inline-flex;align-items:center;gap:.7em}
+  .kicker::before{content:"";width:28px;height:1px;background:var(--green);opacity:.8}
+  .kicker.amber{color:var(--amber)} .kicker.amber::before{background:var(--amber)}
+  .kicker.wire{color:var(--wire)} .kicker.wire::before{background:var(--wire)}
+  .kicker.rose{color:var(--rose)} .kicker.rose::before{background:var(--rose)}
+  .kicker.teal{color:var(--teal)} .kicker.teal::before{background:var(--teal)}
+
+  h1,h2,h3{font-family:"Bricolage Grotesque",sans-serif;line-height:1.04;letter-spacing:-.02em}
+  h1{font-size:clamp(2.8rem,7.5vw,6.2rem);font-weight:800}
+  h2{font-size:clamp(1.7rem,3.8vw,3.2rem);font-weight:700;margin:.4rem 0 .2rem}
+  h3{font-size:clamp(1.05rem,1.8vw,1.4rem);font-weight:700}
+
+  p.lead{color:var(--muted);font-size:clamp(1rem,1.4vw,1.2rem);max-width:62ch}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+  strong,b{color:var(--ink);font-weight:700}
+  .hl{color:var(--green);font-weight:700}
+  .hl-a{color:var(--amber);font-weight:700}
+  .hl-w{color:var(--wire);font-weight:700}
+  .hl-r{color:var(--rose);font-weight:700}
+  .hl-t{color:var(--teal);font-weight:700}
+  .chip{font-family:"JetBrains Mono",monospace;font-size:.84em;background:rgba(74,222,128,.08);
+        border:1px solid var(--line-strong);color:var(--green-2);padding:.07em .42em;border-radius:5px}
+  .chip.a{background:rgba(255,180,84,.1);border-color:rgba(255,180,84,.3);color:var(--amber-2)}
+  .chip.w{background:rgba(91,176,255,.1);border-color:rgba(91,176,255,.3);color:#a8d4ff}
+  .chip.r{background:rgba(251,113,133,.1);border-color:rgba(251,113,133,.3);color:#ffb0bd}
+
+  .panel{background:var(--panel);border:1px solid var(--line-strong);border-radius:14px;
+         padding:clamp(14px,1.8vw,24px);backdrop-filter:blur(2px)}
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:800px){.g2,.g3{grid-template-columns:1fr}}
+
+  .rails{border-left:3px solid var(--green);padding:.2rem 0 .2rem 1rem;color:var(--muted);font-size:.95rem}
+  .rails b{color:var(--green)}
+
+  .num-watermark{position:absolute;right:clamp(20px,5vw,90px);top:50%;transform:translateY(-50%);
+    font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:min(42vh,430px);
+    line-height:1;color:transparent;-webkit-text-stroke:2px rgba(100,180,120,.09);
+    z-index:0;pointer-events:none;user-select:none}
+
+  ul.ticks{list-style:none;display:grid;gap:.65rem}
+  ul.ticks li{position:relative;padding-left:1.7rem;color:var(--muted)}
+  ul.ticks li::before{content:"›";position:absolute;left:.2rem;top:-.05rem;
+    color:var(--green);font-family:"JetBrains Mono",monospace;font-weight:700}
+  ul.ticks li b{color:var(--ink)}
+
+  /* route table */
+  .rtable{font-family:"JetBrains Mono",monospace;font-size:.82rem;border-collapse:collapse;width:100%}
+  .rtable th{text-align:left;padding:.45rem .8rem;color:var(--faint);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid var(--line-strong);font-family:"Hanken Grotesk",sans-serif}
+  .rtable td{padding:.5rem .8rem;border-bottom:1px dashed var(--line);color:var(--muted)}
+  .rtable td:first-child{color:var(--green-2)}
+  .rtable tr:last-child td{border-bottom:none}
+  .rtable .note{color:var(--faint);font-family:"Hanken Grotesk",sans-serif;font-size:.82rem;font-style:italic}
+  .rtable .igw-row td{background:rgba(255,180,84,.05)}
+  .rtable .igw-row td:nth-child(2){color:var(--amber-2)}
+  .rtable .nat-row td{background:rgba(91,176,255,.05)}
+  .rtable .nat-row td:nth-child(2){color:#a8d4ff}
+  .rtable .peer-row td{background:rgba(94,234,212,.05)}
+  .rtable .peer-row td:nth-child(2){color:var(--teal)}
+
+  /* flow diagram */
+  .flow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-family:"JetBrains Mono",monospace;font-size:.8rem}
+  .flow-node{border:1px solid var(--line-strong);border-radius:8px;padding:.45rem .7rem;background:var(--panel);text-align:center;color:var(--muted)}
+  .flow-node strong{display:block;color:var(--ink);font-size:.82rem}
+  .flow-node.pub{border-color:rgba(255,180,84,.4)}
+  .flow-node.priv{border-color:rgba(91,176,255,.35)}
+  .flow-node.net{border-color:rgba(74,222,128,.35)}
+  .flow-arr{color:var(--green);font-weight:700;font-size:1rem}
+
+  /* comparison cards */
+  .cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:780px){.cmp-grid{grid-template-columns:1fr}}
+  .cmp-card{border-radius:12px;padding:1rem 1.1rem}
+  .cmp-card.igw{border:1px solid rgba(255,180,84,.35);background:rgba(255,180,84,.04)}
+  .cmp-card.nat{border:1px solid rgba(91,176,255,.35);background:rgba(91,176,255,.04)}
+  .cmp-card h3{display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem}
+  .dot{width:.55rem;height:.55rem;border-radius:50%}
+  .dot.igw{background:var(--amber)} .dot.nat{background:var(--wire)}
+  .cmp-card p{color:var(--muted);font-size:.9rem;margin-top:.3rem}
+  .cmp-card .price{font-family:"JetBrains Mono",monospace;font-size:.7rem;margin-top:.6rem;padding:.35rem .55rem;border-radius:6px;background:rgba(0,0,0,.3)}
+  .cmp-card.igw .price{color:var(--green-2)} .cmp-card.nat .price{color:var(--rose)}
+
+  /* cost table */
+  .cost-rows{display:grid;gap:9px;margin-top:1rem}
+  .cost-row{display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:center;padding:.65rem .9rem;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+  .cost-row .cl{color:var(--muted);font-size:.9rem} .cost-row .cl b{color:var(--ink)}
+  .cost-row .cp{font-family:"JetBrains Mono",monospace;font-size:.85rem;white-space:nowrap;font-weight:700}
+  .cost-row.ok{border-color:rgba(74,222,128,.3)} .cost-row.ok .cp{color:var(--green-2)}
+  .cost-row.warn{border-color:rgba(255,180,84,.3)} .cost-row.warn .cp{color:var(--amber-2)}
+  .cost-row.bad{border-color:rgba(251,113,133,.3)} .cost-row.bad .cp{color:var(--rose)}
+
+  /* terraform */
+  pre{background:rgba(0,0,0,.45);border:1px solid var(--line-strong);border-radius:12px;padding:1rem 1.2rem;overflow-x:auto;font-family:"JetBrains Mono",monospace;font-size:.76rem;line-height:1.65;color:var(--muted)}
+  .tk-res{color:var(--wire)} .tk-attr{color:var(--green-2)} .tk-val{color:var(--amber-2)} .tk-cmt{color:var(--faint);font-style:italic}
+
+  /* checkpoints */
+  .check{display:grid;grid-template-columns:auto 1fr;gap:.8rem;align-items:baseline;padding:.6rem .85rem;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+  .check .ci{font-family:"JetBrains Mono",monospace;color:var(--green);font-weight:700;font-size:.88rem;min-width:1.6em}
+  .check .ct{font-size:.93rem;color:var(--muted)} .check .ct b{color:var(--ink)}
+
+  /* chrome */
+  .progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:30;background:linear-gradient(90deg,var(--green),var(--teal));transition:width .5s ease;box-shadow:0 0 14px rgba(74,222,128,.5)}
+  .brand{position:fixed;top:22px;left:clamp(20px,4vw,48px);z-index:20;font-family:"JetBrains Mono",monospace;font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--faint)}
+  .brand b{color:var(--muted)}
+  .hint{position:fixed;bottom:24px;left:clamp(20px,4vw,48px);z-index:20;font-family:"JetBrains Mono",monospace;font-size:.64rem;letter-spacing:.1em;color:var(--faint)}
+  .hint kbd{border:1px solid var(--line-strong);border-radius:4px;padding:.04em .38em;color:var(--muted);margin:0 .1em}
+  .nav{position:fixed;bottom:20px;right:clamp(20px,4vw,48px);z-index:20;display:flex;align-items:center;gap:14px}
+  .counter{font-family:"JetBrains Mono",monospace;font-size:.76rem;color:var(--muted);letter-spacing:.1em}
+  .counter .cur{color:var(--green)}
+  .nbtn{width:42px;height:42px;border-radius:50%;border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:all .25s}
+  .nbtn:hover{border-color:var(--green);color:var(--green);background:rgba(74,222,128,.08);transform:translateY(-2px)}
+  .nbtn:active{transform:translateY(0)}
+  @media(max-width:560px){.hint{display:none}}
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+<div class="brand"><b>AWS Field Manual</b> · Lesson 03</div>
+<div class="hint">Navigate <kbd>←</kbd><kbd>→</kbd> · Fullscreen <kbd>F</kbd></div>
+<div class="nav">
+  <span class="counter"><span class="cur" id="cur">01</span> / <span id="total">10</span></span>
+  <button class="nbtn" id="prev" aria-label="Previous">‹</button>
+  <button class="nbtn" id="next" aria-label="Next">›</button>
+</div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 · TITLE -->
+  <section class="slide is-active">
+    <div class="wrap">
+      <div class="kicker" data-reveal style="transition-delay:.05s">Lesson 03 · Build the doors</div>
+      <h1 data-reveal style="transition-delay:.14s">Routing &<br>Gateways</h1>
+      <p class="lead" data-reveal style="transition-delay:.28s; margin-top:1.4rem">
+        In lesson 02 you <em>labeled</em> subnets public and private — but that was intention, not fact.
+        This is where the labels become <span class="hl">behavior</span>: route tables, the Internet Gateway
+        that makes a subnet public, and the NAT Gateway that lets private tasks reach out without being reachable.
+      </p>
+      <div data-reveal style="transition-delay:.42s; margin-top:1.8rem; display:flex; gap:2rem; flex-wrap:wrap; font-family:'JetBrains Mono',monospace; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)">
+        <span>Route tables</span><span>·</span><span>IGW vs NAT</span><span>·</span><span>The famous cost trap</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · MENTAL MODEL -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="kicker" data-reveal>Mental model</div>
+      <h2 data-reveal style="transition-delay:.1s">The route table is a signpost<br>at every intersection.</h2>
+      <div class="panel" data-reveal style="transition-delay:.22s; margin-top:1.4rem; border-left:3px solid var(--green)">
+        <p style="font-family:'Bricolage Grotesque',sans-serif;font-weight:600;font-size:clamp(1.1rem,2vw,1.5rem);letter-spacing:-.01em;line-height:1.25">
+          "For the local network go here, for the internet go there." An
+          <span class="hl-a">Internet Gateway</span> is a two-way street door (public).
+          A <span class="hl-w">NAT Gateway</span> is a one-way exit — your private tasks can walk out
+          to the internet, but nobody can walk in.
+        </p>
+      </div>
+      <div class="grid g2" data-reveal style="transition-delay:.36s; margin-top:1.3rem">
+        <div class="panel" style="border-color:rgba(255,180,84,.3);text-align:center">
+          <div style="font-family:'Bricolage Grotesque';font-size:1.5rem;font-weight:800;color:var(--amber)">IGW ⇄</div>
+          <p class="muted" style="font-size:.88rem;margin-top:.3rem">Two-way door. Public. Free.</p>
+        </div>
+        <div class="panel" style="border-color:rgba(91,176,255,.3);text-align:center">
+          <div style="font-family:'Bricolage Grotesque';font-size:1.5rem;font-weight:800;color:var(--wire)">NAT →</div>
+          <p class="muted" style="font-size:.88rem;margin-top:.3rem">One-way exit. Outbound only. Costs money.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · HOW A ROUTE TABLE DECIDES -->
+  <section class="slide">
+    <div class="num-watermark">03</div>
+    <div class="wrap">
+      <div class="kicker wire" data-reveal>How a route table decides</div>
+      <h2 data-reveal style="transition-delay:.08s">Most-specific route wins</h2>
+      <p class="lead" data-reveal style="transition-delay:.18s; margin-top:.7rem">
+        Every packet leaving a subnet is matched against its route table. AWS picks the
+        <strong>longest-prefix match</strong>. One built-in <span class="chip">local</span> route (the whole VPC CIDR) can never be removed.
+      </p>
+      <div class="panel" data-reveal style="transition-delay:.3s; margin-top:1.2rem">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin-bottom:.6rem">Route table · public subnet</div>
+        <table class="rtable">
+          <tr><th>Destination</th><th>Target</th><th>Meaning</th></tr>
+          <tr><td>10.0.0.0/16</td><td>local</td><td class="note">built-in: talk to anything in the VPC</td></tr>
+          <tr class="igw-row"><td>0.0.0.0/0</td><td>igw-xxxx</td><td class="note">everything else → the internet</td></tr>
+        </table>
+      </div>
+      <p data-reveal style="transition-delay:.42s; margin-top:1.1rem; font-size:.95rem">
+        A packet to <span class="chip">10.0.5.10</span> matches <span class="chip">local</span> — stays internal.
+        A packet to <span class="chip">52.x.x.x</span> matches only <span class="chip">0.0.0.0/0</span> → IGW.
+        <span class="hl-a">That one line is the entire difference between public and private.</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- 3b · LONGEST-PREFIX WORKED EXAMPLE -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="kicker wire" data-reveal>Longest-prefix match · worked example</div>
+      <h2 data-reveal style="transition-delay:.08s; font-size:clamp(1.4rem,2.6vw,2.1rem)">Three destinations, three winners</h2>
+
+      <div class="panel" data-reveal style="transition-delay:.18s; margin-top:1rem">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--wire);margin-bottom:.6rem">Route table · private subnet with peering + NAT</div>
+        <table class="rtable">
+          <tr><th>Destination</th><th>Target</th><th>Meaning</th></tr>
+          <tr><td>10.0.0.0/16</td><td>local</td><td class="note">same VPC</td></tr>
+          <tr class="peer-row"><td>10.50.0.0/16</td><td>pcx-12345</td><td class="note">Analytics VPC (peering)</td></tr>
+          <tr class="nat-row"><td>0.0.0.0/0</td><td>nat-gw-67890</td><td class="note">everything else</td></tr>
+        </table>
+      </div>
+
+      <div class="grid g3" data-reveal style="transition-delay:.32s; margin-top:1rem">
+        <div class="panel" style="border-color:rgba(74,222,128,.3)">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--green-2)">→ 10.0.2.50</div>
+          <p class="muted" style="font-size:.8rem;margin-top:.4rem">same VPC</p>
+          <p style="font-size:.82rem;margin-top:.5rem">matches <span class="chip">/16</span> · most specific<br><span class="hl">local ✓</span></p>
+        </div>
+        <div class="panel" style="border-color:rgba(91,176,255,.3)">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.78rem;color:#a8d4ff">→ 10.50.3.75</div>
+          <p class="muted" style="font-size:.8rem;margin-top:.4rem">Analytics VPC</p>
+          <p style="font-size:.82rem;margin-top:.5rem">matches <span class="chip w">/16</span> · most specific<br><span class="hl-w">peering ✓</span></p>
+        </div>
+        <div class="panel" style="border-color:rgba(255,180,84,.3)">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--amber-2)">→ 8.8.8.8</div>
+          <p class="muted" style="font-size:.8rem;margin-top:.4rem">Google</p>
+          <p style="font-size:.82rem;margin-top:.5rem">matches <span class="chip a">/0</span> · only match<br><span class="hl-a">NAT Gateway ✓</span></p>
+        </div>
+      </div>
+
+      <p data-reveal style="transition-delay:.44s; margin-top:1.1rem; font-size:.92rem; color:var(--muted)">
+        AWS always picks the <strong>longest prefix</strong> (biggest slash number). A <span class="chip">/16</span> beats <span class="chip">/0</span>,
+        so specific destinations win before the catch-all <span class="chip">0.0.0.0/0</span> ever applies.
+      </p>
+    </div>
+  </section>
+
+  <!-- 4 · IGW vs NAT -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="kicker amber" data-reveal>Two gateways, two directions</div>
+      <h2 data-reveal style="transition-delay:.08s">IGW makes it public.<br>NAT makes it outbound-only.</h2>
+      <div class="cmp-grid" data-reveal style="transition-delay:.2s; margin-top:1.3rem">
+        <div class="cmp-card igw">
+          <h3><span class="dot igw"></span>Internet Gateway</h3>
+          <p>The VPC's <b>two-way door.</b> One per VPC. A subnet goes public when its route table points <span class="chip a">0.0.0.0/0 → IGW</span> <em>and</em> the resource has a public IP.</p>
+          <p style="margin-top:.5rem">Carries the ALB's inbound public traffic.</p>
+          <div class="price">Free · no bandwidth limit</div>
+        </div>
+        <div class="cmp-card nat">
+          <h3><span class="dot nat"></span>NAT Gateway</h3>
+          <p>The <b>one-way exit.</b> Sits in a <em>public</em> subnet. Private subnets route <span class="chip w">0.0.0.0/0 → NAT</span> so tasks can reach out — but the internet can't reach in.</p>
+          <p style="margin-top:.5rem">Pull images, deliver webhooks, call APIs.</p>
+          <div class="price">~$32/mo + $0.045/GB 💸</div>
+        </div>
+      </div>
+      <div class="rails" data-reveal style="transition-delay:.36s; margin-top:1.2rem">
+        <b>The key asymmetry:</b> a private task can <em>initiate</em> a connection outward and get the reply — but the internet <em>cannot initiate</em> a connection inward. That's how Sidekiq delivers a webhook while staying unreachable.
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · THE TWO PATHS -->
+  <section class="slide">
+    <div class="num-watermark">05</div>
+    <div class="wrap">
+      <div class="kicker teal" data-reveal>The whole traffic story</div>
+      <h2 data-reveal style="transition-delay:.08s; font-size:clamp(1.5rem,2.8vw,2.2rem)">Inbound, outbound, and never</h2>
+
+      <div class="panel" data-reveal style="transition-delay:.2s; margin-top:1.1rem; border-color:rgba(255,180,84,.25)">
+        <div class="kicker" style="margin-bottom:.6rem">Inbound · a user hits your API</div>
+        <div class="flow">
+          <span class="flow-node net">internet</span><span class="flow-arr">→</span>
+          <span class="flow-node pub"><strong>IGW</strong></span><span class="flow-arr">→</span>
+          <span class="flow-node pub"><strong>ALB</strong>public subnet</span><span class="flow-arr">→</span>
+          <span class="flow-node priv"><strong>Fargate task</strong>private subnet</span>
+        </div>
+      </div>
+
+      <div class="panel" data-reveal style="transition-delay:.3s; margin-top:.8rem; border-color:rgba(91,176,255,.25)">
+        <div class="kicker wire" style="margin-bottom:.6rem">Outbound · a task calls a webhook</div>
+        <div class="flow">
+          <span class="flow-node priv"><strong>Fargate task</strong>private</span><span class="flow-arr">→</span>
+          <span class="flow-node pub"><strong>NAT GW</strong>public subnet</span><span class="flow-arr">→</span>
+          <span class="flow-node pub"><strong>IGW</strong></span><span class="flow-arr">→</span>
+          <span class="flow-node net">internet</span>
+        </div>
+      </div>
+
+      <div class="panel" data-reveal style="transition-delay:.4s; margin-top:.8rem; border-color:rgba(251,113,133,.25)">
+        <div class="kicker rose" style="margin-bottom:.6rem">Never</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--rose);line-height:1.7">
+          internet ──✗──► Fargate task directly &nbsp;<span style="color:var(--faint)">(no public IP, no inbound route)</span><br>
+          internet ──✗──► RDS / Redis &nbsp;<span style="color:var(--faint)">(private subnet, no internet route)</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · NAT COST TRAP -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="kicker rose" data-reveal>The most infamous AWS bill surprise</div>
+      <h2 data-reveal style="transition-delay:.08s">The NAT Gateway cost trap</h2>
+      <p class="lead" data-reveal style="transition-delay:.18s; margin-top:.7rem">
+        A NAT Gateway costs <strong>two ways</strong>: <span class="hl-r">~$0.045/hr just for existing</span> (≈$32/mo, even idle)
+        <em>and</em> <span class="hl-r">~$0.045 per GB</span> processed.
+      </p>
+      <div class="cost-rows" data-reveal style="transition-delay:.3s">
+        <div class="cost-row ok">
+          <span class="cl"><b>1 NAT GW</b>, low traffic — Workforce prod today</span>
+          <span class="cp">~$32/mo</span>
+        </div>
+        <div class="cost-row warn">
+          <span class="cl"><b>3 NAT GW</b> (per-AZ), idle — often overkill</span>
+          <span class="cp">~$96/mo</span>
+        </div>
+        <div class="cost-row bad">
+          <span class="cl"><b>Heavy S3-via-NAT</b> egress — fix with a VPC endpoint (L14)</span>
+          <span class="cp">$32 + $$$</span>
+        </div>
+      </div>
+      <div class="rails" data-reveal style="transition-delay:.42s; margin-top:1.2rem">
+        <b>Rule of thumb:</b> one NAT is usually fine to start · add per-AZ NAT only when AZ-isolated egress failure is a real risk · route S3/ECR/Secrets through <span class="hl">VPC endpoints</span>, not the NAT.
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · THE EXPOSURE BUG -->
+  <section class="slide">
+    <div class="num-watermark">07</div>
+    <div class="wrap">
+      <div class="kicker rose" data-reveal>Blast radius · the accidental exposure bug</div>
+      <h2 data-reveal style="transition-delay:.08s; font-size:clamp(1.5rem,2.8vw,2.2rem)">One wrong line exposes everything</h2>
+      <div class="panel" data-reveal style="transition-delay:.2s; margin-top:1.1rem; border-color:rgba(251,113,133,.35)">
+        <p style="font-size:.9rem;color:var(--muted);margin-bottom:.6rem">Someone adds this to the <b>private</b> subnets' route table "to fix a connectivity issue":</p>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:.6rem .9rem;background:rgba(251,113,133,.08);border-radius:8px;color:var(--rose)">
+          0.0.0.0/0 → igw-xxxx &nbsp;&nbsp;<span style="color:var(--amber)">← WRONG target (IGW instead of NAT)</span>
+        </div>
+      </div>
+      <ul class="ticks" data-reveal style="transition-delay:.32s; margin-top:1.1rem; font-size:.92rem">
+        <li>Private tasks with a public IP → <b style="color:var(--rose)">now reachable from the internet</b></li>
+        <li>Security groups become the <b>only</b> thing between the internet and your app</li>
+        <li>You've silently converted "defense in depth" into <b>"one misconfigured SG from breach"</b></li>
+      </ul>
+      <div class="panel" data-reveal style="transition-delay:.44s; margin-top:1.1rem; border-left:3px solid var(--green)">
+        <p style="font-size:.95rem"><span class="hl">The fix:</span> private subnets route <span class="chip">0.0.0.0/0</span> to the <b>NAT Gateway</b>, never the IGW. This is why lesson 02 kept insisting: <em>follow the route table.</em></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · TERRAFORM -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="kicker wire" data-reveal>The Terraform</div>
+      <h2 data-reveal style="transition-delay:.08s; font-size:clamp(1.4rem,2.6vw,2rem)">It all reduces to one target</h2>
+      <div data-reveal style="transition-delay:.18s; margin-top:.9rem">
+<pre><span class="tk-cmt"># Two-way public door — one IGW per VPC (free)</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_internet_gateway"</span> <span class="tk-val">"igw"</span> { <span class="tk-attr">vpc_id</span> = <span class="tk-val">aws_vpc.main.id</span> }
+
+<span class="tk-cmt"># PUBLIC route table — this single line makes subnets public</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_route_table"</span> <span class="tk-val">"public"</span> {
+  <span class="tk-attr">route</span> {
+    <span class="tk-attr">cidr_block</span> = <span class="tk-val">"0.0.0.0/0"</span>
+    <span class="tk-attr">gateway_id</span> = <span class="tk-val">aws_internet_gateway.igw.id</span>   <span class="tk-cmt"># → IGW = public</span>
+  }
+}
+
+<span class="tk-cmt"># NAT lives in a PUBLIC subnet — the ~$32/mo component</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_nat_gateway"</span> <span class="tk-val">"nat"</span> {
+  <span class="tk-attr">allocation_id</span> = <span class="tk-val">aws_eip.nat.id</span>
+  <span class="tk-attr">subnet_id</span>     = <span class="tk-val">aws_subnet.public_a.id</span>
+}
+
+<span class="tk-cmt"># PRIVATE route table — → NAT, NOT the IGW. Outbound-only.</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_route_table"</span> <span class="tk-val">"private"</span> {
+  <span class="tk-attr">route</span> {
+    <span class="tk-attr">cidr_block</span>     = <span class="tk-val">"0.0.0.0/0"</span>
+    <span class="tk-attr">nat_gateway_id</span> = <span class="tk-val">aws_nat_gateway.nat.id</span>  <span class="tk-cmt"># → NAT = outbound-only</span>
+  }
+}</pre>
+      </div>
+      <p class="muted" data-reveal style="transition-delay:.3s; margin-top:.8rem; font-size:.88rem">
+        The whole public/private distinction is just <span class="hl-a">which target <span class="chip">0.0.0.0/0</span> points at</span> — IGW (two-way) or NAT (outbound-only). Everything else is wiring.
+      </p>
+    </div>
+  </section>
+
+  <!-- 8b · FULL TERRAFORM -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="kicker wire" data-reveal>The Terraform · full annotated version</div>
+      <h2 data-reveal style="transition-delay:.08s; font-size:clamp(1.3rem,2.4vw,1.9rem)">Gateways, route tables, associations</h2>
+      <div class="grid g2" data-reveal style="transition-delay:.18s; margin-top:.8rem; align-items:start">
+<pre style="font-size:.68rem;line-height:1.55"><span class="tk-cmt"># Two-way public door: one IGW per VPC (free)</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_internet_gateway"</span> <span class="tk-val">"igw"</span> {
+  <span class="tk-attr">vpc_id</span> = <span class="tk-val">aws_vpc.main.id</span>
+  <span class="tk-attr">tags</span>   = { <span class="tk-attr">Name</span> = <span class="tk-val">"main-igw"</span> }
+}
+
+<span class="tk-cmt"># PUBLIC route table: "everywhere" → IGW.</span>
+<span class="tk-cmt"># This one route makes subnets public.</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_route_table"</span> <span class="tk-val">"public"</span> {
+  <span class="tk-attr">vpc_id</span> = <span class="tk-val">aws_vpc.main.id</span>
+  <span class="tk-attr">route</span> {
+    <span class="tk-attr">cidr_block</span> = <span class="tk-val">"0.0.0.0/0"</span>
+    <span class="tk-attr">gateway_id</span> = <span class="tk-val">aws_internet_gateway.igw.id</span>
+  }
+  <span class="tk-attr">tags</span> = { <span class="tk-attr">Name</span> = <span class="tk-val">"public-rt"</span> }
+}
+
+<span class="tk-cmt"># Associate public RT with each public subnet</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_route_table_association"</span> <span class="tk-val">"public_a"</span> {
+  <span class="tk-attr">subnet_id</span>      = <span class="tk-val">aws_subnet.public_a.id</span>
+  <span class="tk-attr">route_table_id</span> = <span class="tk-val">aws_route_table.public.id</span>
+}
+<span class="tk-res">resource</span> <span class="tk-val">"aws_route_table_association"</span> <span class="tk-val">"public_b"</span> {
+  <span class="tk-attr">subnet_id</span>      = <span class="tk-val">aws_subnet.public_b.id</span>
+  <span class="tk-attr">route_table_id</span> = <span class="tk-val">aws_route_table.public.id</span>
+}</pre>
+
+<pre style="font-size:.68rem;line-height:1.55"><span class="tk-cmt"># One-way exit: NAT in a PUBLIC subnet,</span>
+<span class="tk-cmt"># needs a static EIP. ~$32/mo + per-GB.</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_eip"</span> <span class="tk-val">"nat"</span> {
+  <span class="tk-attr">domain</span> = <span class="tk-val">"vpc"</span>
+  <span class="tk-attr">tags</span>   = { <span class="tk-attr">Name</span> = <span class="tk-val">"nat-eip"</span> }
+}
+<span class="tk-res">resource</span> <span class="tk-val">"aws_nat_gateway"</span> <span class="tk-val">"nat"</span> {
+  <span class="tk-attr">allocation_id</span> = <span class="tk-val">aws_eip.nat.id</span>
+  <span class="tk-attr">subnet_id</span>     = <span class="tk-val">aws_subnet.public_a.id</span>
+  <span class="tk-attr">tags</span>          = { <span class="tk-attr">Name</span> = <span class="tk-val">"main-nat"</span> }
+  <span class="tk-attr">depends_on</span>    = [<span class="tk-val">aws_internet_gateway.igw</span>]
+}
+
+<span class="tk-cmt"># PRIVATE route table: "everywhere" → NAT,</span>
+<span class="tk-cmt"># NOT the IGW. Outbound-only.</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_route_table"</span> <span class="tk-val">"private"</span> {
+  <span class="tk-attr">vpc_id</span> = <span class="tk-val">aws_vpc.main.id</span>
+  <span class="tk-attr">route</span> {
+    <span class="tk-attr">cidr_block</span>     = <span class="tk-val">"0.0.0.0/0"</span>
+    <span class="tk-attr">nat_gateway_id</span> = <span class="tk-val">aws_nat_gateway.nat.id</span>
+  }
+  <span class="tk-attr">tags</span> = { <span class="tk-attr">Name</span> = <span class="tk-val">"private-rt"</span> }
+}
+
+<span class="tk-cmt"># All private subnets share the one NAT</span>
+<span class="tk-res">resource</span> <span class="tk-val">"aws_route_table_association"</span> <span class="tk-val">"private_a"</span> {
+  <span class="tk-attr">subnet_id</span>      = <span class="tk-val">aws_subnet.private_a.id</span>
+  <span class="tk-attr">route_table_id</span> = <span class="tk-val">aws_route_table.private.id</span>
+}
+<span class="tk-res">resource</span> <span class="tk-val">"aws_route_table_association"</span> <span class="tk-val">"private_b"</span> {
+  <span class="tk-attr">subnet_id</span>      = <span class="tk-val">aws_subnet.private_b.id</span>
+  <span class="tk-attr">route_table_id</span> = <span class="tk-val">aws_route_table.private.id</span>
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · HOW WORKFORCE DOES IT -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="kicker teal" data-reveal>How Workforce does it · us-east-2</div>
+      <h2 data-reveal style="transition-delay:.08s; font-size:clamp(1.5rem,2.8vw,2.2rem)">One NAT, not three — deliberately</h2>
+      <div class="grid g2" data-reveal style="transition-delay:.2s; margin-top:1.2rem">
+        <div class="panel">
+          <div class="kicker" style="margin-bottom:.5rem">The setup</div>
+          <ul class="ticks" style="gap:.5rem;font-size:.9rem">
+            <li><b>1 Internet Gateway</b> — the public door</li>
+            <li><b>1 NAT Gateway</b> + 1 Elastic IP, in a public subnet</li>
+            <li><span class="chip a">0.0.0.0/0 → IGW</span> makes public subnets public</li>
+            <li><b>3 private routes</b> <span class="chip w">0.0.0.0/0 → NAT</span> — all AZs share the one NAT</li>
+          </ul>
+        </div>
+        <div class="panel" style="border-color:rgba(255,180,84,.3)">
+          <div class="kicker amber" style="margin-bottom:.5rem">The tradeoff to explain</div>
+          <p class="muted" style="font-size:.9rem">One NAT (~$32/mo) vs one-per-AZ (~$96/mo). If the NAT's AZ fails, <em>outbound</em> internet from other AZs breaks — but inbound via the multi-AZ ALB still works.</p>
+          <p style="font-size:.9rem;margin-top:.6rem;color:var(--ink)">A <b>deliberate</b> cost tradeoff, not an oversight.</p>
+        </div>
+      </div>
+      <div class="rails" data-reveal style="transition-delay:.36s; margin-top:1.2rem">
+        The <b>Workforce Agent</b> environment drops the NAT entirely and uses <span class="hl">VPC endpoints</span> (S3 + ECR + Secrets + logs) instead — same problem, cheaper solution. You'll fully get it after lesson 14.
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 · CHECKPOINTS -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="kicker teal" data-reveal>Before you move on</div>
+      <h2 data-reveal style="transition-delay:.08s">Six checkpoints — one per advance</h2>
+      <div id="checkpoint-container" style="margin-top:1.4rem; min-height:130px">
+        <!-- checkpoints injected by JS -->
+      </div>
+      <div id="checkpoint-nav" style="margin-top:1.6rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; max-width:420px">
+        <button id="checkpoint-prev" class="nbtn" style="position:relative; width:40px; height:40px">‹</button>
+        <span style="font-family:'JetBrains Mono',monospace; font-size:.76rem; color:var(--muted); letter-spacing:.1em">
+          <span id="checkpoint-cur">1</span> / 6
+        </span>
+        <button id="checkpoint-next" class="nbtn" style="position:relative; width:40px; height:40px">›</button>
+      </div>
+      <div data-reveal style="transition-delay:.34s; margin-top:1.8rem; display:flex; align-items:center; gap:1rem">
+        <span class="kicker wire" style="margin:0">Where this goes next</span>
+        <span style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.15rem">→ 04 — Security Groups &amp; NACLs</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const slides  = Array.from(document.querySelectorAll('.slide'));
+  const progress= document.getElementById('progress');
+  const cur     = document.getElementById('cur');
+  const total   = document.getElementById('total');
+  let i = 0;
+  const pad = n => String(n).padStart(2,'0');
+  total.textContent = pad(slides.length);
+
+  const checkpoints = [
+    "What single route-table entry is the entire difference between a public and a private subnet?",
+    "How does the route table choose between local and 0.0.0.0/0? (What rule decides?)",
+    "What does a NAT Gateway let a private task do, and what does it prevent?",
+    "Roughly what does one NAT Gateway cost per month idle, and name two ways NAT costs balloon.",
+    "Where does a NAT Gateway itself have to live, and why (which subnet type)?",
+    "A subnet with no route-table association uses which route table — and why is that a footgun?"
+  ];
+  let checkpointIdx = 0;
+
+  function renderCheckpoint(idx){
+    document.getElementById('checkpoint-container').innerHTML = `
+      <div class="check" style="opacity:0; animation:slideIn .5s ease forwards; font-size:1.05rem">
+        <span class="ci">${pad(idx + 1)}</span>
+        <span class="ct"><b>${checkpoints[idx]}</b></span>
+      </div>`;
+    document.getElementById('checkpoint-cur').textContent = idx + 1;
+  }
+  function checkpointGo(n){
+    checkpointIdx = Math.max(0, Math.min(checkpoints.length - 1, n));
+    renderCheckpoint(checkpointIdx);
+  }
+  document.getElementById('checkpoint-next').addEventListener('click', () => checkpointGo(checkpointIdx + 1));
+  document.getElementById('checkpoint-prev').addEventListener('click', () => checkpointGo(checkpointIdx - 1));
+
+  function go(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, idx) => s.classList.toggle('is-active', idx === i));
+    cur.textContent = pad(i + 1);
+    progress.style.width = (i / (slides.length - 1) * 100) + '%';
+    if (i === slides.length - 1) { checkpointIdx = 0; renderCheckpoint(0); }
+  }
+
+  document.getElementById('next').addEventListener('click', () => go(i + 1));
+  document.getElementById('prev').addEventListener('click', () => go(i - 1));
+
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)){ e.preventDefault(); go(i+1); }
+    else if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){ e.preventDefault(); go(i-1); }
+    else if (e.key==='Home') go(0);
+    else if (e.key==='End')  go(slides.length-1);
+    else if (e.key==='f'||e.key==='F'){
+      !document.fullscreenElement ? document.documentElement.requestFullscreen?.() : document.exitFullscreen?.();
+    }
+  });
+
+  let x0=null;
+  document.getElementById('deck').addEventListener('touchstart',e=>x0=e.touches[0].clientX,{passive:true});
+  document.getElementById('deck').addEventListener('touchend',e=>{
+    if(x0===null)return;
+    const dx=e.changedTouches[0].clientX-x0;
+    if(Math.abs(dx)>50)go(i+(dx<0?1:-1));
+    x0=null;
+  },{passive:true});
+
+  const style = document.createElement('style');
+  style.textContent = `@keyframes slideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }`;
+  document.head.appendChild(style);
+
+  go(0);
+</script>
+</body>
+</html>
